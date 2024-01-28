@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Text to Speech</title>
+	</head>
+	<body>
+		<div class="container">
+			<h4 class="title">监听股票池</h1>
+				<div id='dynamicList'>
+
+				</div>
+				</br>
+				<input placeholder="请输入需要监听的股票代码" id="code_input" type="number" />
+
+				<button onclick="updateStock(0)">添加</button>
+
+				<button onclick="updateStock(1)">删除</button>
+
+				</br>
+				<h5>设置查询间隔时间,单位秒</h5>
+				<input placeholder="请输入查询间隔时间" id="interval_input" type="number" />
+				<button onclick="startMonitor()">开始</button>
+
+				<button onclick="pasueMonitor()">暂停</button>
+				</br>
+				</br>
+
+
+		</div>
+	</body>
+	<style type="text/css">
+		.container {
+			margin: 20px;
+		}
+
+		.title {
+			font-size: 20px;
+		}
+
+		button {
+			width: 80px;
+			height: 40px;
+			margin-left: 10px;
+		}
+
+		input {
+			height: 40px;
+			padding-left: 10px;
+			border-radius: 5px;
+			margin-right: 10px;
+		}
+	</style>
+	<script>
+		var intervalId;
+		var s = localStorage.getItem("stocks");
+		var arr;
+		if (s != undefined) {
+			arr = s.split(",");
+		}
+
+		console.log(s);
+		var stocks = arr == null ? [] : arr;
+		// 获取要插入列表项的 ul 元素
+		var listContainer = document.getElementById('dynamicList');
+		listContainer.innerHTML = "";
+
+		// 循环遍历数组，并将每个元素添加为列表项
+		stocks.forEach(function(item) {
+			// 创建列表项 li 元素
+			var listItem = document.createElement('li');
+
+			// 设置列表项的文本内容为数组元素的值
+			listItem.textContent = item;
+			listItem.id = item;
+			// 将列表项添加到 ul 元素中
+			listContainer.appendChild(listItem);
+
+		});
+		var flag = true;
+		var t = localStorage.getItem("interval");
+		var interval = t == undefined ? 10 : parseInt(t);
+		document.getElementById("interval_input").value = interval
+
+		function startMonitor() {
+			flag = true;
+			if (window.speechSynthesis.paused) {
+				window.speechSynthesis.resume();
+			}
+			var t = document.getElementById("interval_input").value;
+			if (t != undefined) {
+				interval = parseInt(document.getElementById("interval_input").value);
+				localStorage.setItem("interval", interval);
+			}
+			// 每隔1000毫秒（1秒）执行一次
+			intervalId = setInterval(function() {
+				if (flag) {
+					stocks.forEach(function(item) {
+
+						get_quote(item);
+					});
+				}
+			}, interval * 1000);
+
+		}
+
+		function pasueMonitor() {
+			flag = false;
+			window.speechSynthesis.pause();
+			clearInterval(intervalId);
+		}
+
+		function get_quote(code) {
+			var url = "http://push2.eastmoney.com/api/qt/stock/get";
+			var params = {
+				"fields": "f58,f734,f107,f57,f43,f59,f169,f170,f152,f177,f111,f46,f60,f44,f45,f47,f260,f48,f261,f279,f277,f278,f288,f19,f17,f531,f15,f13,f11,f20,f18,f16,f14,f12,f39,f37,f35,f33,f31,f40,f38,f36,f34,f32,f211,f212,f213,f214,f215,f210,f209,f208,f207,f206,f161,f49,f171,f50,f86,f84,f85,f168,f108,f116,f167,f164,f162,f163,f92,f71,f117,f292,f51,f52,f191,f192,f262,f294,f295,f269,f270,f256,f257,f285,f286",
+				"secid": get_full_security_code(code)
+			};
+
+			var xhr = new XMLHttpRequest();
+
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState == 4 && xhr.status == 200) {
+					var responseData = JSON.parse(xhr.responseText);
+					var msg = responseData.data.f58 + "   当前股价" + responseData.data.f43 / 100 + "   当前涨幅" + responseData
+						.data.f170 / 100 + "%";
+					document.getElementById(responseData.data.f57).innerHTML = msg;
+					voiceBroadcast(msg);
+				}
+			};
+
+			xhr.open('GET', url + "?" + Object.keys(params).map(function(key) {
+				return key + '=' + encodeURIComponent(params[key]);
+			}).join('&'), true);
+			xhr.send();
+
+		}
+
+
+
+		function get_full_security_code(code) {
+			if (code.startsWith("51") || code.startsWith("60") || code.startsWith("68"))
+				return "1." + code;
+			else if (code.startsWith("1") || code.startsWith("0") || code.startsWith("3") || code.startsWith("4") || code
+				.startsWith("8")) {
+				return "0." + code;
+			} else
+				console.error("暂未支持的证券代码");
+
+		}
+
+		function voiceBroadcast(text) {
+			// 创建 SpeechSynthesisUtterance 对象并设置文本
+			var utterance = new SpeechSynthesisUtterance(text);
+
+			// 使用浏览器内置的语音合成引擎进行语音合成
+			window.speechSynthesis.speak(utterance);
+			console.log("speek");
+		}
+
+		function updateStock(type) {
+			var code = document.getElementById("code_input").value;
+			if (code.length == 0) {
+				alert("请输入股票代码");
+				return;
+			}
+			if (code.length != 6) {
+				alert("请输入正确的股票代码");
+				return;
+			} else {
+				if (stocks.indexOf(code) == -1) {
+					if (type == 1) {
+						alert("监听股票池中不存在该股票");
+						return;
+					}
+					stocks.push(code);
+					console.log(stocks);
+
+					// 要显示在列表中的数组
+					var dataArray = [];
+					localStorage.setItem("stocks", stocks);
+					// 获取要插入列表项的 ul 元素
+					var listContainer = document.getElementById('dynamicList');
+					listContainer.innerHTML = "";
+
+					// 循环遍历数组，并将每个元素添加为列表项
+					stocks.forEach(function(item) {
+						// 创建列表项 li 元素
+						var listItem = document.createElement('li');
+
+						// 设置列表项的文本内容为数组元素的值
+						listItem.textContent = item;
+						listItem.id = item;
+						// 将列表项添加到 ul 元素中
+						listContainer.appendChild(listItem);
+
+					});
+				} else {
+
+					if (type == 0) {
+						alert('该股票已在池中');
+					} else {
+						index = stocks.indexOf(code);
+						stocks.splice(index, 1);
+						console.log(stocks);
+						// 获取要插入列表项的 ul 元素
+						var listContainer = document.getElementById('dynamicList');
+						var element = document.getElementById(code);
+						listContainer.removeChild(element)
+						localStorage.setItem("stocks", stocks);
+
+					}
+				}
+			}
+		}
+	</script>
+</html>
