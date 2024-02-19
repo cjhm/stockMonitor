@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上班喝水提醒</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        #timer {
+            font-size: 2em;
+            margin: 20px 0;
+            color: #007bff;
+        }
+        #drinkWaterBtn {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>上班喝水提醒</h1>
+    <label for="startTime">开始时间:</label>
+    <input type="time" id="startTime" value="09:00">
+    <label for="endTime">结束时间:</label>
+    <input type="time" id="endTime" value="18:00">
+    <label for="reminderCount">提醒次数:</label>
+    <input type="number" id="reminderCount" min="1" max="10" value="38">
+    <label for="interval">喝水间隔(分钟):</label>
+    <input type="number" id="interval" min="1" max="120" value="1">
+    <div id="timer">距离下次喝水还有 <span id="countdown"></span></div>
+    <button id="drinkWaterBtn">喝水时间到！</button>
+
+    <script>
+        // 获取页面元素
+        const countdownElement = document.getElementById('countdown');
+        const drinkWaterBtn = document.getElementById('drinkWaterBtn');
+        const startTimeInput = document.getElementById('startTime');
+        const endTimeInput = document.getElementById('endTime');
+        const reminderCountInput = document.getElementById('reminderCount');
+        const intervalInput = document.getElementById('interval');
+
+        let reminderInterval;
+        let remindersRemaining;
+
+        // 更新倒计时
+        function updateCountdown() {
+            let timeLeft = reminderInterval;
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            timeLeft %= (1000 * 60 * 60);
+            const minutes = Math.floor(timeLeft / (1000 * 60));
+            timeLeft %= (1000 * 60);
+            const seconds = Math.floor(timeLeft / 1000);
+            if (seconds == 0 && minutes == 0 && hours == 0) {
+                alert('自定义提醒话术：喝水时间到啦！记得补充水分哦！');
+                speak('喝水时间到啦！记得补充水分哦');
+            }
+            countdownElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // 计算下一次提醒的时间
+        function calculateNextReminderTime() {
+            const now = new Date();
+            const startTime = new Date(now.toDateString() + ' ' + startTimeInput.value);
+            const endTime = new Date(now.toDateString() + ' ' + endTimeInput.value);
+            let interval = parseInt(intervalInput.value) * 60 * 1000; // 转换为毫秒
+            if (now < startTime) {
+                return startTime - now;
+            } else if (now > endTime) {
+                const tomorrowStartTime = new Date(startTime);
+                tomorrowStartTime.setDate(tomorrowStartTime.getDate() + 1);
+                return tomorrowStartTime - now;
+            } else {
+                let nextReminderTime = now.getTime() + interval;
+                while (nextReminderTime < endTime.getTime()) {
+                    if (nextReminderTime > now.getTime()) {
+                        return nextReminderTime - now;
+                    }
+                    nextReminderTime += interval;
+                }
+                return endTime - now;
+            }
+        }
+
+        // 使用语音提醒
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            speechSynthesis.speak(utterance);
+        }
+
+        // 初始化
+        function init() {
+            reminderInterval = calculateNextReminderTime();
+            remindersRemaining = parseInt(reminderCountInput.value);
+            updateCountdown();
+        }
+        
+        init();
+
+        // 定时器，每秒更新一次倒计时
+        setInterval(() => {
+            reminderInterval -= 1000;
+            if (reminderInterval <= 0) {
+                if (remindersRemaining > 0) {
+                    remindersRemaining--;
+                    updateCountdown();
+                    if (remindersRemaining === 0) {
+                        drinkWaterBtn.style.display = 'block';
+                        setTimeout(() => {
+                            alert('自定义提醒话术：喝水时间到啦！记得补充水分哦！');
+                        }, 1000); // 在倒计时结束后延迟一秒钟触发弹窗
+                    } else {
+                        reminderInterval = calculateNextReminderTime();
+                    }
+                }
+            } else {
+                updateCountdown(); // 如果未触发提醒，仍然更新倒计时
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
